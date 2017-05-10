@@ -49,4 +49,6 @@ FORMS    += mainwindow.ui \
 CONFIG   += static
 
 DISTFILES += \
-    .gitignore
+    .gitignore \
+    design.md \
+    license.md
