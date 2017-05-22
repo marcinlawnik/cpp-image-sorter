@@ -10,8 +10,24 @@
 #include <QGraphicsScene>
 #include <QPixmap>
 #include <QFileDialog>
+#include <QSettings>
+#include <QString>
 #include <reportdialog.h>
-
+#include <settingsdialog.h>
+#include <thumbsprogressdialog.h>
+#include <QDebug>
+#include <QFuture>
+#include <QtConcurrent/QtConcurrent>
+#include <QMessageBox>
+#include <QCloseEvent>
+//This below is a clusterfuck to get it to work, should be better
+//Paths taken form Magick++.h
+//#include <Magick++/lib/Magick++.h>
+//#include <Magick++/lib/Magick++/Include.h>
+//#include <Magick++/lib/Magick++/Image.h>
+//#include <Magick++/lib/Magick++/Pixels.h>
+//#include <Magick++/lib/Magick++/STL.h>
+#include <Magick++.h>
 
 namespace Ui {
 class MainWindow;
@@ -50,6 +66,10 @@ private slots:
 
     void on_checkBox_bad_clicked();
 
+    void on_actionZako_cz_triggered();
+
+    void on_actionUstawienia_triggered();
+
 private:
     Ui::MainWindow *ui;
     HelpDialog *helpdialog;
@@ -60,13 +80,19 @@ private:
     QPixmap image;
     QImage  *imageObject;
     QGraphicsScene *scene;
+    QSettings *settings;
+    Magick::Image magickImage;
     void loadImage();
     void showEvent(QShowEvent *);
     void resizeEvent(QResizeEvent *);
     void setupProgressBar();
     void updateProgressBar();
+    void setupSettings();
     void loadNewFolder(QString dir);
     void updateCheckboxes();
+    ThumbsProgressDialog *thumbsProgressDialog;
+    int userReallyWantsToQuit();
+    void closeEvent(QCloseEvent *event);
 };
 
 #endif // MAINWINDOW_H

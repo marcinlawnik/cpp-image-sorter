@@ -6,10 +6,20 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    //Setup GraphicsMagick
+    //Setup settings
+    setupSettings();
     //Setup ImageController
     setupImageController();
     setupProgressBar();
     imagecopier = new ImageCopier();
+    Magick::InitializeMagick(NULL);
+    this->thumbsProgressDialog = new ThumbsProgressDialog(this);
+    connect(this->imagecontroller,
+            SIGNAL(thumbsCountUpdated(int, QString)),
+            this->thumbsProgressDialog,
+            SLOT(on_imagecontroller_thumbsCountUpdated(int, QString))
+            );
 }
 
 MainWindow::~MainWindow()
@@ -101,21 +111,13 @@ void MainWindow::loadImage()
     //Update checkboxes
     this->updateCheckboxes();
 
+    //Display file name
+
+    ui->filenameLabel->setText(imagecontroller->getCurrentImageName());
+
     //Display image path
     //ui->directory_label->setText(this->imagecontroller->getCurrentImagePath());
 
-}
-
-
-
-void MainWindow::showEvent(QShowEvent *)
-{
-    ui->graphicsView->fitInView(scene->sceneRect(),Qt::KeepAspectRatio);
-}
-
-void MainWindow::resizeEvent(QResizeEvent *)
-{
-    ui->graphicsView->fitInView(scene->sceneRect(),Qt::KeepAspectRatio);
 }
 
 void MainWindow::loadNewFolder(QString dir)
@@ -124,19 +126,12 @@ void MainWindow::loadNewFolder(QString dir)
     this->imagecontroller->loadDir(dir);
     //Display working directory in main window
     ui->directory_label->setText(this->imagecontroller->getCurrentDir());
-    //Load first image
-    imageObject = new QImage();
-    imageObject->load(this->imagecontroller->getCurrentImagePath());
-
-    image = QPixmap::fromImage(*imageObject);
-
     scene = new QGraphicsScene(this);
-    scene->addPixmap(image);
-    scene->setSceneRect(image.rect());
     ui->graphicsView->setScene(scene);
-
     this->setupProgressBar();
-    this->updateCheckboxes();
+    //Create image object
+    imageObject = new QImage();
+    this->loadImage();
 }
 
 
@@ -186,34 +181,35 @@ void MainWindow::on_badimagelist_clicked()
 void MainWindow::on_doSortButton_clicked()
 {
     //TODO ask for confirmation?
-    //COPY good images to "good directory"
-    QDir *dir = new QDir("");
-    dir->mkdir("good");
-    QStringList goodimglist = this->imagecontroller->getGoodImageList();
-    QString sourcepath = dir->absolutePath() + "\\";
-    int i=0;
-    for(i=0;i<goodimglist.size();i++)
-    {
-        QFile::copy(sourcepath + goodimglist.at(i), sourcepath + "good/"+goodimglist.at(i));
-    }
-    //COPY bad images to "bad directory"
-    dir->mkdir("bad");
-    QStringList badimglist = this->imagecontroller->getBadImageList();
-    int j=0;
-    for(j=0;j<badimglist.size();j++)
-    {
-        QFile::copy(sourcepath + badimglist.at(j), sourcepath + "bad/"+badimglist.at(j));
-    }
+    //COPY good images to "good directory", if any are chosen
+    int goodCount = this->imagecontroller->doCopyGoodImages();
 
+
+    //COPY bad images to "bad directory", if any are chosen
+    int badCount = this->imagecontroller->doCopyBadImages();
+
+
+    //TODO refactor into separate function
     //notify user of progress
     ReportDialog *report = new ReportDialog(this);
     QString text = "Skopiowano ";
-    text.append(QString::number(i));
+    text.append(QString::number(goodCount));
     text.append(" dobrych obrazków i ");
-    text.append(QString::number(j));
+    text.append(QString::number(badCount));
     text.append(" złych obrazków.");
     report->setLabel(text);
     report->show();
+
+    //Generate thumbnails
+    //notify user of progress
+    //Create a dialog to show progress
+    //Take into account amount of thumb sizes (*4)
+    this->thumbsProgressDialog->setMaximum(this->imagecontroller->getGoodImageList().size()*4);
+    this->thumbsProgressDialog->show();
+    this->imagecontroller->doMakeThumbsAsync();
+    this->imagecontroller->doGenerateImagesWithWatermarkAsync();
+
+
 }
 
 void MainWindow::on_checkBox_bad_clicked()
@@ -226,3 +222,83 @@ void MainWindow::on_checkBox_good_clicked()
     this->imagecontroller->toggleGood();
 }
 
+void MainWindow::setupSettings()
+{
+    //Set those values so that settings can be read from the system
+    QCoreApplication::setOrganizationName("marcinlawnik");
+    QCoreApplication::setOrganizationDomain("lawniczak.me");
+    QCoreApplication::setApplicationName("cpp-image-sorter");
+    //List of all settings?
+    this->settings = new QSettings;
+    //Set different values than default for testing
+    //this->settings->setValue("dir/nameGood", "yologood");
+    //this->settings->setValue("dir/nameBad", "yolobad");
+    //this->settings->setValue("dir/nameThumbs", "thumbs");
+    //this->settings->setValue("dir/nameWatermark", "watermarked");
+    //Set sane default values
+    //Rewrite this to a loop TODO
+    if(!this->settings->contains("dir/nameGood")) {
+        this->settings->setValue("dir/nameGood", "good");
+    }
+    if(!this->settings->contains("dir/nameBad")) {
+        this->settings->setValue("dir/nameBad", "bad");
+    }
+    if(!this->settings->contains("dir/nameThumbs")) {
+        this->settings->setValue("dir/nameThumbs", "thumbs");
+    }
+    if(!this->settings->contains("dir/nameWatermark")) {
+        this->settings->setValue("dir/nameWatermark", "watermarked");
+    }
+
+    this->settings->sync();
+}
+
+
+//TODO implement this
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (userReallyWantsToQuit()) {
+        this->settings->sync();
+        event->accept();
+    } else {
+        event->ignore();
+    }
+}
+
+int MainWindow::userReallyWantsToQuit()
+{
+    const QMessageBox::StandardButton ret =
+            QMessageBox::warning(this, QCoreApplication::applicationName(),
+                                 tr("Czy na pewno chcesz wyjść?"),
+                                 QMessageBox::Close | QMessageBox::Cancel);
+    if(ret==QMessageBox::Cancel)
+    {
+        return false;
+    }
+    return true;
+}
+
+
+
+void MainWindow::on_actionZako_cz_triggered()
+{
+    MainWindow::close();
+}
+
+void MainWindow::on_actionUstawienia_triggered()
+{
+    //Otwórz okno z ustawieniami
+
+    SettingsDialog *settings = new SettingsDialog(this);
+    settings->show();
+}
+
+void MainWindow::showEvent(QShowEvent *)
+{
+    ui->graphicsView->fitInView(scene->sceneRect(),Qt::KeepAspectRatio);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *)
+{
+    ui->graphicsView->fitInView(scene->sceneRect(),Qt::KeepAspectRatio);
+}

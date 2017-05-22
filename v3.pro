@@ -30,7 +30,9 @@ SOURCES += main.cpp\
     imagelistdialog.cpp \
     goodimagelistdialog.cpp \
     imagecopier.cpp \
-    reportdialog.cpp
+    reportdialog.cpp \
+    settingsdialog.cpp \
+    thumbsprogressdialog.cpp
 
 HEADERS  += mainwindow.h \
     helpdialog.h \
@@ -38,17 +40,36 @@ HEADERS  += mainwindow.h \
     imagelistdialog.h \
     goodimagelistdialog.h \
     imagecopier.h \
-    reportdialog.h
+    reportdialog.h \
+    settingsdialog.h \
+    thumbsprogressdialog.h
 
 FORMS    += mainwindow.ui \
     helpdialog.ui \
     imagelistdialog.ui \
     goodimagelistdialog.ui \
-    reportdialog.ui
+    reportdialog.ui \
+    settingsdialog.ui \
+    thumbsprogressdialog.ui
 
 CONFIG   += static
 
 DISTFILES += \
     .gitignore \
     design.md \
-    license.md
+    license.md \
+    watermark.jpg \
+    watermark.png
+
+#graphicsmagick config
+
+INCLUDEPATH += "C:\MinGW\msys\1.0\local\include\GraphicsMagick"
+INCLUDEPATH += "C:\MinGW\msys\1.0\local\lib"
+
+QMAKE_CXXFLAGS += -I"C:\MinGW\msys\1.0\local\include\GraphicsMagick" -D_LIB -D_MT
+
+LIBS += -L"C:\MinGW\msys\1.0\local\lib"
+LIBS += -lGraphicsMagick++ -lGraphicsMagick -ljpeg -lpng15 -lz -lgdi32 -lm -lgomp -lpthread
+
+RESOURCES += \
+    cpp-image-sorter.qrc
